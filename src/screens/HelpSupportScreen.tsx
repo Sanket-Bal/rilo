@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Linking } from 'react-native';
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from '../lib/config';
 
 const { width } = Dimensions.get('window');
 
@@ -108,8 +109,8 @@ export default function HelpSupportScreen({
       >
         <View style={styles.contactCard}>
           <Text style={styles.contactTitle}>Quick Contact</Text>
-          <Text style={styles.contactEmail}>📧 support@rilo.app</Text>
-          <Text style={styles.contactPhone}>📱 1800-RILO-HELP</Text>
+          <Text style={styles.contactEmail}>📧 {SUPPORT_EMAIL}</Text>
+          <Text style={styles.contactPhone}>📱 {SUPPORT_PHONE}</Text>
           <TouchableOpacity style={styles.contactBtn}>
             <Text style={styles.contactBtnText}>Message Us →</Text>
           </TouchableOpacity>
