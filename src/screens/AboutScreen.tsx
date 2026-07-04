@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { APP_VERSION } from '../lib/config';
 
 const { width } = Dimensions.get('window');
 
@@ -61,7 +62,7 @@ export default function AboutScreen({
           <Text style={styles.appName}>RILO</Text>
           <Text style={styles.tagline}>The Airbnb for Bikes</Text>
           <View style={styles.versionBadge}>
-            <Text style={styles.versionText}>v1.0.0</Text>
+            <Text style={styles.versionText}>v{APP_VERSION}</Text>
           </View>
         </View>
 
