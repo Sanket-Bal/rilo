@@ -10,6 +10,8 @@ import OwnerWelcomeScreen from './owner/OwnerWelcomeScreen';
 import BikeListingScreen from './owner/BikeListingScreen';
 import OwnerHomeScreen from './owner/OwnerHomeScreen';
 import ActiveRideOverlay from '../components/ActiveRideOverlay';
+import UserActiveRideOverlay from '../components/UserActiveRideOverlay';
+import ConfirmationScreen from './ConfirmationScreen';
 
 import {
   ActivityIndicator,
@@ -118,6 +120,11 @@ export default function HomeScreen({
   const [locationReady, setLocationReady] = useState(false);
   const [showBikeListing, setShowBikeListing] = useState(false);
   const [showOwnerHome, setShowOwnerHome] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+const [bookingRequestIdForConfirmation, setBookingRequestIdForConfirmation] = useState<string>('');
+const [selectedBikeForConfirmation, setSelectedBikeForConfirmation] = useState<BikeType | null>(null);
+const [durationForConfirmation, setDurationForConfirmation] = useState(1);
+const [userLocationForConfirmation, setUserLocationForConfirmation] = useState({ latitude: 0, longitude: 0 });
 
   // Owner booking request system
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
@@ -753,148 +760,172 @@ export default function HomeScreen({
         style={[styles.bottomSheet, { height: bottomSheetY }]}
         {...panResponder.panHandlers}
       >
-        {activeRide ? (
-          // ── ACTIVE RIDE MODE ──
-          <View style={styles.activeRideSheet}>
-            <View style={styles.handleWrapper}>
-              <View style={styles.handle} />
-            </View>
+        {activeRide && activeRide.isRenter ? (
+  // ── RENTER ACTIVE RIDE (Bottom Sheet Overlay) ──
+  <UserActiveRideOverlay
+    ride={activeRide}
+    onEndRide={onRideEnd}
+    onHandoverComplete={async (radius, geofenceEnabled) => {
+      try {
+        await supabase
+          .from('bookings')
+          .update({
+            handover_status: 'handed_over',
+            roaming_enabled: geofenceEnabled,
+            roaming_radius_km: radius,
+            handover_location_lat: location.latitude,
+            handover_location_lng: location.longitude,
+          })
+          .eq('id', activeRide.id);
 
-            {/* Status bar */}
-            <View style={styles.activeRideStatus}>
-              <View style={styles.activeRideDot} />
-              <Text style={styles.activeRideStatusText}>Ride Active — Enjoy your ride!</Text>
-            </View>
+        console.log('[HomeScreen] Handover complete - geofence:', geofenceEnabled, 'radius:', radius);
+      } catch (err) {
+        console.log('[HomeScreen] Error updating handover details:', err);
+      }
+    }}
+  />
+) : activeRide && !activeRide.isRenter ? (
+  // ── OWNER ACTIVE RIDE (Old bottom sheet for now) ──
+  <View style={styles.activeRideSheet}>
+    <View style={styles.handleWrapper}>
+      <View style={styles.handle} />
+    </View>
 
-            {/* Live timer */}
-            <View style={styles.activeRideTimerRow}>
-              <View style={styles.activeRideTimerBox}>
-                <Text style={styles.activeRideTimerLabel}>Time Elapsed</Text>
-                <Text style={styles.activeRideTimerValue}>
-                  {String(Math.floor(rideElapsedSeconds / 3600)).padStart(2, '0')}:
-                  {String(Math.floor((rideElapsedSeconds % 3600) / 60)).padStart(2, '0')}:
-                  {String(rideElapsedSeconds % 60).padStart(2, '0')}
-                </Text>
-              </View>
-              <View style={styles.activeRideTimerBox}>
-                <Text style={styles.activeRideTimerLabel}>Current Fare</Text>
-                <Text style={styles.activeRideTimerValue}>
-                  ₹{Math.round(activeRide.pricePerHour * (rideElapsedSeconds / 3600))}
-                </Text>
-              </View>
-            </View>
+    {/* Status bar */}
+    <View style={styles.activeRideStatus}>
+      <View style={styles.activeRideDot} />
+      <Text style={styles.activeRideStatusText}>Renter Coming — Get ready!</Text>
+    </View>
 
-            {/* Bike info */}
-            <View style={styles.activeRideCard}>
-              <View style={styles.activeRideInfo}>
-                <Text style={styles.activeRideName}>{activeRide.bikeName}</Text>
-                <Text style={styles.activeRideOwner}>Owner: {activeRide.ownerName}</Text>
-                <Text style={styles.activeRideId}>ID: {activeRide.id}</Text>
-              </View>
-              <View style={styles.activeRidePriceBox}>
-                <Text style={styles.activeRidePriceLabel}>Deposit Paid</Text>
-                <Text style={styles.activeRidePriceValue}>₹{Math.round(activeRide.pricePerHour * 10)}</Text>
-              </View>
-            </View>
+    {/* Live timer */}
+    <View style={styles.activeRideTimerRow}>
+      <View style={styles.activeRideTimerBox}>
+        <Text style={styles.activeRideTimerLabel}>Time Elapsed</Text>
+        <Text style={styles.activeRideTimerValue}>
+          {String(Math.floor(rideElapsedSeconds / 3600)).padStart(2, '0')}:
+          {String(Math.floor((rideElapsedSeconds % 3600) / 60)).padStart(2, '0')}:
+          {String(rideElapsedSeconds % 60).padStart(2, '0')}
+        </Text>
+      </View>
+      <View style={styles.activeRideTimerBox}>
+        <Text style={styles.activeRideTimerLabel}>Current Fare</Text>
+        <Text style={styles.activeRideTimerValue}>
+          ₹{Math.round(activeRide.pricePerHour * (rideElapsedSeconds / 3600))}
+        </Text>
+      </View>
+    </View>
 
-            {/* Ride details row */}
-            <View style={styles.activeRideDetailsRow}>
-              {[
-                { label: 'Booked For', value: `${activeRide.durationHours}h` },
-                { label: 'Rate', value: `₹${activeRide.pricePerHour}/hr` },
-                { label: 'Deposit', value: `₹${Math.round(activeRide.pricePerHour * 10)}` },
-              ].map((item, index) => (
-                <View key={index} style={styles.activeRideDetailBox}>
-                  <Text style={styles.activeRideDetailLabel}>{item.label}</Text>
-                  <Text style={styles.activeRideDetailValue}>{item.value}</Text>
+    {/* Bike info */}
+    <View style={styles.activeRideCard}>
+      <View style={styles.activeRideInfo}>
+        <Text style={styles.activeRideName}>{activeRide.bikeName}</Text>
+        <Text style={styles.activeRideOwner}>Renter: {activeRide.renterName}</Text>
+        <Text style={styles.activeRideId}>ID: {activeRide.id}</Text>
+      </View>
+      <View style={styles.activeRidePriceBox}>
+        <Text style={styles.activeRidePriceLabel}>Deposit Paid</Text>
+        <Text style={styles.activeRidePriceValue}>₹{Math.round(activeRide.pricePerHour * 10)}</Text>
+      </View>
+    </View>
+
+    {/* Ride details row */}
+    <View style={styles.activeRideDetailsRow}>
+      {[
+        { label: 'Booked For', value: `${activeRide.durationHours}h` },
+        { label: 'Rate', value: `₹${activeRide.pricePerHour}/hr` },
+        { label: 'Deposit', value: `₹${Math.round(activeRide.pricePerHour * 10)}` },
+      ].map((item, index) => (
+        <View key={index} style={styles.activeRideDetailBox}>
+          <Text style={styles.activeRideDetailLabel}>{item.label}</Text>
+          <Text style={styles.activeRideDetailValue}>{item.value}</Text>
+        </View>
+      ))}
+    </View>
+
+    {/* End Ride button */}
+    <TouchableOpacity
+      style={styles.endRideBtn}
+      onPress={onRideEnd}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.endRideBtnText}>End Ride</Text>
+    </TouchableOpacity>
+  </View>
+) : (
+  // ── NORMAL MODE (Bike List) ──
+  <>
+    <TouchableOpacity
+      style={styles.handleWrapper}
+      onPress={toggleBottomSheet}
+      activeOpacity={0.7}
+    >
+      <View style={styles.handle} />
+      <Text style={styles.bottomSheetTitle}>
+        {bikesLoading
+          ? 'Finding bikes nearby...'
+          : `${bikes.length} bikes nearby`}
+      </Text>
+    </TouchableOpacity>
+
+    {bikesLoading ? (
+      <View style={styles.bikesLoadingContainer}>
+        <ActivityIndicator color="#E8241A" size="small" />
+        <Text style={styles.bikesLoadingText}>
+          Searching for bikes near you...
+        </Text>
+      </View>
+    ) : bikes.length === 0 ? (
+      <View style={styles.noBikesContainer}>
+        <Text style={styles.noBikesIcon}>🛵</Text>
+        <Text style={styles.noBikesTitle}>No bikes nearby</Text>
+        <Text style={styles.noBikesSubtitle}>
+          Be the first to list a bike in your area!
+        </Text>
+      </View>
+    ) : (
+    <FlatList
+      data={bikes}
+      keyExtractor={item => item.id}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.cardList}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.85}
+          onPress={() => setSelectedBike(item)}
+        >
+          <Image
+            source={item.image}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+          <View style={styles.cardInfo}>
+            <View style={styles.cardTopRow}>
+              <Text style={styles.cardName}>{item.name}</Text>
+              {item.gps && (
+                <View style={styles.gpsBadge}>
+                  <Text style={styles.gpsBadgeText}>GPS</Text>
                 </View>
-              ))}
-            </View>
-
-            {/* End Ride button */}
-            <TouchableOpacity
-              style={styles.endRideBtn}
-              onPress={onRideEnd}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.endRideBtnText}>End Ride</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          // ── NORMAL MODE ──
-          <>
-            <TouchableOpacity
-              style={styles.handleWrapper}
-              onPress={toggleBottomSheet}
-              activeOpacity={0.7}
-            >
-              <View style={styles.handle} />
-              <Text style={styles.bottomSheetTitle}>
-                {bikesLoading
-                  ? 'Finding bikes nearby...'
-                  : `${bikes.length} bikes nearby`}
-              </Text>
-            </TouchableOpacity>
-
-            {bikesLoading ? (
-              <View style={styles.bikesLoadingContainer}>
-                <ActivityIndicator color="#E8241A" size="small" />
-                <Text style={styles.bikesLoadingText}>
-                  Searching for bikes near you...
-                </Text>
-              </View>
-            ) : bikes.length === 0 ? (
-              <View style={styles.noBikesContainer}>
-                <Text style={styles.noBikesIcon}>🛵</Text>
-                <Text style={styles.noBikesTitle}>No bikes nearby</Text>
-                <Text style={styles.noBikesSubtitle}>
-                  Be the first to list a bike in your area!
-                </Text>
-              </View>
-            ) : (
-            <FlatList
-              data={bikes}
-              keyExtractor={item => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.cardList}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.card}
-                  activeOpacity={0.85}
-                  onPress={() => setSelectedBike(item)}
-                >
-                  <Image
-                    source={item.image}
-                    style={styles.cardImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.cardInfo}>
-                    <View style={styles.cardTopRow}>
-                      <Text style={styles.cardName}>{item.name}</Text>
-                      {item.gps && (
-                        <View style={styles.gpsBadge}>
-                          <Text style={styles.gpsBadgeText}>GPS</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.cardType}>{item.type} · {item.distance}</Text>
-                    <Text style={styles.cardPrice}>
-                      ₹{item.price}
-                      <Text style={styles.cardPriceUnit}>/hr</Text>
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.bookBtn}
-                    onPress={() => checkDocuments(item)}
-                  >
-                    <Text style={styles.bookBtnText}>Book</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
               )}
-        />
+            </View>
+            <Text style={styles.cardType}>{item.type} · {item.distance}</Text>
+            <Text style={styles.cardPrice}>
+              ₹{item.price}
+              <Text style={styles.cardPriceUnit}>/hr</Text>
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.bookBtn}
+            onPress={() => checkDocuments(item)}
+          >
+            <Text style={styles.bookBtnText}>Book</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
       )}
-    </>
+    />
   )}
+  </>
+)}
       </Animated.View>
       {selectedBike && (
         <BikeDetailScreen
@@ -936,108 +967,53 @@ export default function HomeScreen({
       setShowDocs(false);
       setSelectedBike(null);
     }}
-    onConfirm={async (rideDataFromConfirmation?: any) => {
-  setShowDocs(false);
-  setSelectedBike(null);
-
-  // ✅ If ConfirmationScreen passed data, use it directly (after converting format)
-  if (rideDataFromConfirmation?.bookingRequestId) {
-    // ConfirmationScreen data is in OLD format, convert to NEW format
-    const rideData = {
-      id: rideDataFromConfirmation.bookingRequestId,
-      bikeId: selectedBike?.id || '',
-      bikeName: rideDataFromConfirmation.bikeName,
-      bikeImage: selectedBike?.image || require('../../assets/activa.png'),
-      renterName: (await supabase.auth.getUser()).data.user?.email || 'Renter',
-      renterAvatar: null,
-      renterRating: 4.5,
-      ownerName: rideDataFromConfirmation.owner,
-      ownerAvatar: null,
-      ownerRating: 4.8,
-      pricePerHour: rideDataFromConfirmation.price,
-      durationHours: rideDataFromConfirmation.duration,
-      userLocation: {
+    onConfirm={async (bookingData) => {
+      console.log('[HomeScreen] BookingScreen completed, showing ConfirmationScreen');
+      setSelectedBikeForConfirmation(selectedBike);
+      setBookingRequestIdForConfirmation(bookingData.bookingRequestId);
+      setDurationForConfirmation(bookingData.duration);
+      setUserLocationForConfirmation({
         latitude: location.latitude,
         longitude: location.longitude,
-      },
-      ownerLocation: rideDataFromConfirmation.bikeLocation,
-      isRenter: true,
-    };
-    onRideStart(rideData);
-    return;
-  }
+      });
+      setShowConfirmation(true);
+    }}
+  />
+)}
 
-      // ✅ RENTER: Fetch the booking request just created
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Get the latest booking request for this renter
-        const { data: bookingRequest } = await supabase
-          .from('booking_requests')
-          .select('*')
-          .eq('renter_id', user.id)
-          .eq('bike_id', selectedBike.id)
-          .eq('status', 'pending')
-          .order('requested_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (bookingRequest) {
-          console.log('[HomeScreen] Renter booking request created:', bookingRequest.id);
-
-          // Fetch bike and owner details
-          const { data: bike } = await supabase
-            .from('bikes')
-            .select('*')
-            .eq('id', selectedBike.id)
-            .single();
-
-          const { data: ownerProfile } = await supabase
-            .from('profiles')
-            .select('full_name, avatar_url')
-            .eq('id', bike.owner_id)
-            .single();
-
-          const { data: bikeImages } = await supabase
-            .from('bike_images')
-            .select('image_path')
-            .eq('bike_id', bike.id)
-            .limit(1);
-
-          // Build ride object for renter view
-          const rideData = {
-            id: bookingRequest.id,
-            bikeId: bike.id,
-            bikeName: `${bike.brand} ${bike.model}`,
-            bikeImage: bikeImages?.[0]?.image_path
-              ? { uri: bikeImages[0].image_path }
-              : require('../../assets/activa.png'),
-            renterName: user.email || 'Renter',
-            renterAvatar: null,
-            renterRating: 4.5,
-            ownerName: ownerProfile?.full_name || 'Owner',
-            ownerAvatar: ownerProfile?.avatar_url || null,
-            ownerRating: 4.8,
-            pricePerHour: bike.price_per_hour,
-            durationHours: bookingRequest.duration_hours || 3,
-            userLocation: {
-              latitude: location.latitude,
-              longitude: location.longitude,
-            },
-            ownerLocation: {
-              latitude: bike.latitude || location.latitude,
-              longitude: bike.longitude || location.longitude,
-            },
-            isRenter: true, // ✅ RENTER VIEW
-          };
-
-          // ✅ Show ActiveRideOverlay immediately (waiting for owner approval)
-          onRideStart(rideData);
-        }
-      } catch (err) {
-        console.log('[HomeScreen] Error creating renter ride view:', err);
-      }
+  {showConfirmation && selectedBikeForConfirmation && (
+  <ConfirmationScreen
+    bike={selectedBikeForConfirmation}
+    duration={durationForConfirmation}
+    userLocation={userLocationForConfirmation}
+    bookingRequestId={bookingRequestIdForConfirmation}
+    onGoHome={(rideData) => {
+      console.log('[HomeScreen] ConfirmationScreen completed, starting ride');
+      setShowConfirmation(false);
+      setShowDocs(false);
+      setSelectedBike(null);
+      setSelectedBikeForConfirmation(null);
+      
+      onRideStart({
+        id: rideData.bookingRequestId,
+        bikeId: selectedBikeForConfirmation.id,
+        bikeName: rideData.bikeName,
+        bikeImage: selectedBikeForConfirmation.image,
+        renterName: 'Renter',
+        renterAvatar: null,
+        renterRating: 4.5,
+        ownerName: rideData.owner,
+        ownerAvatar: null,
+        ownerRating: selectedBikeForConfirmation.rating || 4.5,
+        pricePerHour: rideData.price,
+        durationHours: rideData.duration,
+        userLocation: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+        },
+        ownerLocation: rideData.bikeLocation,
+        isRenter: true,
+      });
     }}
   />
 )}
@@ -1157,31 +1133,7 @@ export default function HomeScreen({
     onDismiss={() => dismissRequest()}
   />
 )}
-      {activeRide && (
-  <ActiveRideOverlay
-    ride={activeRide}
-    onEndRide={onRideEnd}
-    onHandoverComplete={async (radius, geofenceEnabled) => {
-      // Update booking with handover details
-      try {
-        await supabase
-          .from('bookings')
-          .update({
-            handover_status: 'handed_over',
-            roaming_enabled: geofenceEnabled,
-            roaming_radius_km: radius,
-            handover_location_lat: location.latitude,
-            handover_location_lng: location.longitude,
-          })
-          .eq('id', activeRide.id);
-
-        console.log('[HomeScreen] Handover complete - geofence:', geofenceEnabled, 'radius:', radius);
-      } catch (err) {
-        console.log('[HomeScreen] Error updating handover details:', err);
-      }
-    }}
-  />
-)}
+      
     </View>
   );
 }
