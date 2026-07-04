@@ -13,7 +13,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
 
-const { height } = Dimensions.get('window');
+const { height, width } = Dimensions.get('window');
+
+// Responsive calculations
+const digitBoxSize = Math.min(width * 0.12, 48); // 12% of screen width, max 48px
+const digitBoxHeight = digitBoxSize * 1.2;
 
 export default function OTPScreen({
   email,
@@ -127,24 +131,26 @@ export default function OTPScreen({
           <Text style={styles.email}>{email}</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.otpContainer}
-          onPress={() => inputRef.current?.focus()}
-          activeOpacity={1}
-        >
-          {digits.map((digit, index) => (
-            <View
-              key={index}
-              style={[
-                styles.digitBox,
-                digit !== '' && styles.digitBoxFilled,
-                index === otp.length && styles.digitBoxActive,
-              ]}
-            >
-              <Text style={styles.digitText}>{digit}</Text>
-            </View>
-          ))}
-        </TouchableOpacity>
+        <View style={styles.otpWrapper}>
+          <TouchableOpacity
+            style={styles.otpContainer}
+            onPress={() => inputRef.current?.focus()}
+            activeOpacity={1}
+          >
+            {digits.map((digit, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.digitBox,
+                  digit !== '' && styles.digitBoxFilled,
+                  index === otp.length && styles.digitBoxActive,
+                ]}
+              >
+                <Text style={styles.digitText}>{digit}</Text>
+              </View>
+            ))}
+          </TouchableOpacity>
+        </View>
 
         <TextInput
           ref={inputRef}
@@ -206,54 +212,64 @@ const styles = StyleSheet.create({
   },
   inner: {
     flex: 1,
-    paddingHorizontal: 28,
+    paddingHorizontal: Math.min(width * 0.08, 32),
     paddingTop: height * 0.08,
     alignItems: 'center',
   },
   backBtn: {
     alignSelf: 'flex-start',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: Math.min(width * 0.1, 40),
+    height: Math.min(width * 0.1, 40),
+    borderRadius: Math.min(width * 0.05, 20),
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: height * 0.03,
   },
   backArrow: {
-    fontSize: 20,
+    fontSize: Math.min(width * 0.05, 20),
     color: '#FFFFFF',
     fontWeight: '600',
   },
   headerSection: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: height * 0.05,
+    width: '100%',
   },
   title: {
-    fontSize: 28,
+    fontSize: Math.min(width * 0.08, 28),
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 12,
+    marginBottom: height * 0.01,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: Math.min(width * 0.045, 15),
     color: '#888888',
-    marginBottom: 4,
+    marginBottom: height * 0.005,
+    textAlign: 'center',
   },
   email: {
-    fontSize: 15,
+    fontSize: Math.min(width * 0.045, 15),
     color: '#E8241A',
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  otpWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: height * 0.04,
   },
   otpContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: 400,
   },
   digitBox: {
-    width: 48,
-    height: 56,
-    borderRadius: 12,
+    width: digitBoxSize,
+    height: digitBoxHeight,
+    borderRadius: digitBoxSize * 0.25,
     backgroundColor: '#1A1A1A',
     borderWidth: 1.5,
     borderColor: '#2A2A2A',
@@ -269,7 +285,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   digitText: {
-    fontSize: 24,
+    fontSize: digitBoxSize * 0.5,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -281,33 +297,35 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#E8241A',
-    fontSize: 13,
-    marginBottom: 16,
+    fontSize: Math.min(width * 0.04, 13),
+    marginBottom: height * 0.02,
     textAlign: 'center',
+    width: '100%',
   },
   verifyBtn: {
     width: '100%',
+    maxWidth: 400,
     backgroundColor: '#2A2A2A',
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: Math.min(width * 0.04, 14),
+    paddingVertical: height * 0.02,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: height * 0.02,
   },
   verifyBtnActive: {
     backgroundColor: '#E8241A',
   },
   verifyBtnText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: Math.min(width * 0.05, 16),
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   resendBtn: {
-    paddingVertical: 8,
+    paddingVertical: height * 0.01,
   },
   resendText: {
     color: '#555555',
-    fontSize: 14,
+    fontSize: Math.min(width * 0.045, 14),
   },
   resendTextActive: {
     color: '#E8241A',
