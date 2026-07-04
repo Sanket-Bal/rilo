@@ -59,6 +59,7 @@ export default function ConfirmationScreen({
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const approvedAnimationDone = useRef(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(3);
   const statusRef = useRef<string>('pending');
 
   const bikeLocation = {
@@ -126,12 +127,26 @@ export default function ConfirmationScreen({
       const status = data.status;
 
       if (status === 'approved') {
-        statusRef.current = 'approved';
-        setRequestStatus('approved');
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        if (timerRef.current) clearInterval(timerRef.current);
-        playApprovedAnimation();
-      } else if (status === 'rejected') {
+  statusRef.current = 'approved';
+  setRequestStatus('approved');
+  if (pollingRef.current) clearInterval(pollingRef.current);
+  if (timerRef.current) clearInterval(timerRef.current);
+  playApprovedAnimation();
+  
+  // Start countdown timer
+  let secondsLeft = 3;
+  setCountdownSeconds(3);
+  
+  const countdownInterval = setInterval(() => {
+    secondsLeft -= 1;
+    setCountdownSeconds(secondsLeft);
+    
+    if (secondsLeft <= 0) {
+      clearInterval(countdownInterval);
+      handleStartRide();
+    }
+  }, 1000);
+} else if (status === 'rejected') {
         statusRef.current = 'rejected';
         setRequestStatus('rejected');
         if (pollingRef.current) clearInterval(pollingRef.current);
@@ -231,18 +246,48 @@ export default function ConfirmationScreen({
     };
   }, []);
 
-  const handleStartRide = () => {
-  onGoHome({
-    bikeName: bike.name,
-    owner: bike.owner,
-    bikeLocation,
-    bookingId,
-    bookingRequestId,
-    deposit: bike.deposit,
-    price: bike.price,
-    duration,
-    ownerId: bike.owner_id || '',
-  });
+  const handleStartRide = async () => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    onGoHome({
+      id: bookingRequestId,                    // ← Booking request ID
+      bikeId: bike.id,                         // ← Bike ID
+      bikeName: bike.name,                     // ← Bike name (same)
+      bikeImage: bike.image,                   // ← Bike image
+      renterName: user?.email?.split('@')[0] || 'Renter',  // ← Extract name from email
+      renterAvatar: null,                      // ← TODO: fetch from profile later
+      renterRating: 4.5,                       // ← Default rating
+      ownerName: bike.owner,                   // ← Owner name (renamed from 'owner')
+      ownerAvatar: null,                       // ← TODO: fetch from profile later
+      ownerRating: bike.rating,                // ← Owner rating
+      pricePerHour: bike.price,                // ← Renamed from 'price'
+      durationHours: duration,                 // ← Renamed from 'duration'
+      userLocation,                            // ← Renter's location (same)
+      ownerLocation: bikeLocation,             // ← Renamed from 'bikeLocation'
+      isRenter: true,                          // ← Flag: this is renter view
+    });
+  } catch (err) {
+    console.log('[ConfirmationScreen] Error in handleStartRide:', err);
+    // Fallback - still go home even if fetch fails
+    onGoHome({
+      id: bookingRequestId,
+      bikeId: bike.id,
+      bikeName: bike.name,
+      bikeImage: bike.image,
+      renterName: 'Renter',
+      renterAvatar: null,
+      renterRating: 4.5,
+      ownerName: bike.owner,
+      ownerAvatar: null,
+      ownerRating: bike.rating,
+      pricePerHour: bike.price,
+      durationHours: duration,
+      userLocation,
+      ownerLocation: bikeLocation,
+      isRenter: true,
+    });
+  }
 };
 
   const goHomeNoRide = () => {
@@ -404,15 +449,21 @@ export default function ConfirmationScreen({
         </Animated.View>
 
         <Animated.View style={{ opacity: contentFade, alignItems: 'center' }}>
-          <Text style={styles.confirmedTitle}>Booking Approved! 🎉</Text>
-          <Text style={styles.confirmedSubtitle}>
-            {bike.owner} accepted your request. Head to the meetup point!
-          </Text>
-          <View style={styles.bookingIdBox}>
-            <Text style={styles.bookingIdLabel}>Booking ID</Text>
-            <Text style={styles.bookingIdValue}>{bookingId}</Text>
-          </View>
-        </Animated.View>
+  <Text style={styles.confirmedTitle}>Booking Approved! 🎉</Text>
+  <Text style={styles.confirmedSubtitle}>
+    {bike.owner} accepted your request. Head to the meetup point!
+  </Text>
+  <View style={styles.bookingIdBox}>
+    <Text style={styles.bookingIdLabel}>Booking ID</Text>
+    <Text style={styles.bookingIdValue}>{bookingId}</Text>
+  </View>
+  
+  {/* Countdown Timer */}
+  <View style={styles.countdownBox}>
+    <Text style={styles.countdownLabel}>Redirecting in</Text>
+    <Text style={styles.countdownValue}>{countdownSeconds}</Text>
+  </View>
+</Animated.View>
       </View>
 
       <Animated.View style={[styles.detailsSection, { opacity: contentFade }]}>
@@ -839,4 +890,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  countdownBox: {
+  marginTop: 20,
+  backgroundColor: '#1A1A1A',
+  borderRadius: 12,
+  paddingHorizontal: 24,
+  paddingVertical: 16,
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E8241A',
+},
+countdownLabel: {
+  fontSize: 12,
+  color: '#666666',
+  letterSpacing: 0.5,
+  textTransform: 'uppercase',
+  marginBottom: 8,
+},
+countdownValue: {
+  fontSize: 40,
+  fontWeight: '700',
+  color: '#E8241A',
+  lineHeight: 44,
+},
 });
